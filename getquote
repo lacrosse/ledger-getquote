@@ -1,0 +1,50 @@
+#!/usr/bin/env ruby
+
+require 'net/http'
+
+def symbol_to_query(symbol)
+  case symbol
+  when '$', 'USD'
+    ['USDRUB=X', '$', '₽']
+  when '₽', 'RUB'
+    ['RUBUSD=X', '₽', '$']
+  when '€', 'EUR'
+    ['EURUSD=X', '€', '$']
+  else
+    [symbol, symbol, '$']
+  end
+end
+
+def url(query)
+  URI::HTTPS.build(
+    host: 'download.finance.yahoo.com',
+    path: '/d/quotes.csv',
+    query: {
+      s: query,
+      f: 'l1'
+    }.map { |k, v| "#{k}=#{v}" }.join('&')
+  )
+end
+
+def curl(query)
+  Net::HTTP.get(url(query)).strip
+end
+
+query, target_currency, source_currency = symbol_to_query(ARGV[0])
+
+value = curl(query)
+
+if value != 'N/A'
+  price_entry =
+    "#{Time.now.strftime('%Y/%m/%d %T')} " \
+    "#{target_currency} " \
+    "#{value}#{source_currency}"
+
+  STDERR.puts price_entry
+
+  puts price_entry
+else
+  STDERR.puts "no info for #{target_currency}" if ENV['GETQUOTE_DEBUG']
+
+  exit 1
+end
